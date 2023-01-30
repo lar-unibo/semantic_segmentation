@@ -1,0 +1,6 @@
+*.pth
+checkpoints/
+wandb/*
+test_set/
+backbone_checkpoints/
+
