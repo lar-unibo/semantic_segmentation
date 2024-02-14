@@ -5,18 +5,19 @@ import numpy as np
 
 # Set up model
 MODEL_MAP = {
-    'resnet50': network.deeplabv3plus_resnet50,
-    'resnet101': network.deeplabv3plus_resnet101,
-    'swinT': network.deeplabv3plus_swinT,
-    'swinS': network.deeplabv3plus_swinS,
-    'swinB': network.deeplabv3plus_swinB,
-    'swinL': network.deeplabv3plus_swinL,
-    'convnextT': network.deeplabv3plus_convnextT,
-    'convnextS': network.deeplabv3plus_convnextS,
-    'convnextB': network.deeplabv3plus_convnextB,
-    'convnextL': network.deeplabv3plus_convnextL,
-    'convnextXL': network.deeplabv3plus_convnextXL,
+    "resnet50": network.deeplabv3plus_resnet50,
+    "resnet101": network.deeplabv3plus_resnet101,
+    "swinT": network.deeplabv3plus_swinT,
+    "swinS": network.deeplabv3plus_swinS,
+    "swinB": network.deeplabv3plus_swinB,
+    "swinL": network.deeplabv3plus_swinL,
+    "convnextT": network.deeplabv3plus_convnextT,
+    "convnextS": network.deeplabv3plus_convnextS,
+    "convnextB": network.deeplabv3plus_convnextB,
+    "convnextL": network.deeplabv3plus_convnextL,
+    "convnextXL": network.deeplabv3plus_convnextXL,
 }
+
 
 def set_seeds(seed):
     torch.backends.cudnn.deterministic = True
@@ -33,10 +34,12 @@ class PolyLR(torch.optim.lr_scheduler._LRScheduler):
         self.max_iters = max_iters  # avoid zero lr
         self.min_lr = min_lr
         super(PolyLR, self).__init__(optimizer, last_epoch)
-    
+
     def get_lr(self):
-        return [ max( base_lr * ( 1 - self.last_epoch/self.max_iters )**self.power, self.min_lr)
-                for base_lr in self.base_lrs]
+        return [
+            max(base_lr * (1 - self.last_epoch / self.max_iters) ** self.power, self.min_lr)
+            for base_lr in self.base_lrs
+        ]
 
 
 class DiceCoeff(torch.autograd.Function):
@@ -53,13 +56,11 @@ class DiceCoeff(torch.autograd.Function):
 
     # This function has only a single output, so it gets only one gradient
     def backward(self, grad_output):
-
         input, target = self.saved_variables
         grad_input = grad_target = None
 
         if self.needs_input_grad[0]:
-            grad_input = grad_output * 2 * (target * self.union - self.inter) \
-                         / (self.union * self.union)
+            grad_input = grad_output * 2 * (target * self.union - self.inter) / (self.union * self.union)
         if self.needs_input_grad[1]:
             grad_target = None
 
