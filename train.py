@@ -27,7 +27,7 @@ hyperparameter_defaults = dict(
     dataset_name=dataset_name,
     dataset_path="",
     transforms="transforms_base",
-    test_set="test_set_dlo",
+    test_set="",
     test_every_n_epocochs=1,
     scheduler="poly",  # step, cosine, poly
     warmup_steps=1000,
@@ -45,33 +45,15 @@ config = wandb.config
 # set random seed
 set_seeds(config.seed)
 
-"""
 transforms_base = aug.Compose(
     [
-        aug.Compose(
-            [
-                aug.HueSaturationValue(hue_shift_limit=100, sat_shift_limit=100, val_shift_limit=100, p=0.8),
-                aug.ChannelShuffle(p=0.8),
-            ],
-            p=0.5,
-        ),
+        aug.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=50, val_shift_limit=50, p=0.8),
         aug.Flip(p=0.5),
         aug.Perspective(scale=(0, 0.1), p=0.5),
-        # aug.RandomCrop(height=config["img_height"], width=config["img_width"], p=1),
         aug.RandomBrightnessContrast(contrast_limit=[0, 0.1], brightness_limit=[-0.1, 0]),
-        aug.Resize(height=config["img_height"], width=config["img_width"], p=1),
-        aug.RandomSizedCrop(
-            min_max_height=[config["img_height"] - 60, config["img_height"]],
-            height=config["img_height"],
-            width=config["img_width"],
-            p=1.0,
-        ),
-        # aug.Resize(height=config["img_height"], width=config["img_width"], p=1),
     ],
     p=1,
 )
-"""
-transforms_base = None
 
 
 def benchmark(net, device, global_step, threshold=77):
