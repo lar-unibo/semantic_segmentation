@@ -34,10 +34,10 @@ class BasicDataset(torch.utils.data.Dataset):
         img = np.array(cv2.cvtColor(cv2.imread(img_file, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB))
         mask = np.array(cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE))
 
-        if self.transform is None:
-            img = cv2.resize(img, (self.img_w, self.img_h))
-            mask = cv2.resize(mask, (self.img_w, self.img_h))
-        else:
+        img = cv2.resize(img, (self.img_w, self.img_h), interpolation=cv2.INTER_LINEAR)
+        mask = cv2.resize(mask, (self.img_w, self.img_h), interpolation=cv2.INTER_NEAREST)
+
+        if self.transform is not None:
             augmented = self.transform(**{"image": img, "mask": mask})
             img, mask = augmented["image"], augmented["mask"]
 
