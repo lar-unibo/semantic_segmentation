@@ -6,10 +6,10 @@ from dataset import BasicDataset
 import model as network
 from utils import MODEL_MAP
 
-CKPT_TO_LOAD = "checkpoints/CP_Best_riveting-quiver-11.pth"
-PRED_DIR = "/home/alessio/dev/LABELING_DLO_SAM/data/test4_clothes"
-SAVE = False
-PLOT = True
+CKPT_TO_LOAD = "checkpoints/CLOTHES2_lambent-festival-36.pth"
+PRED_DIR = "/home/lar/dev/labeling_dlo_sam/data/TEST_SEGMENTATION/clothes2/gt_imgs"
+SAVE = True
+PLOT = False
 
 
 def predict_img_binary(net, img, device):
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     print("Found {} images to predict".format(len(test_imgs)))
     if SAVE:
         checkpoint_name = os.path.basename(CKPT_TO_LOAD).split(".")[0]
-        save_subdir = os.path.join(PRED_DIR, "pred_" + checkpoint_name)
+        save_subdir = os.path.join(os.path.dirname(PRED_DIR), checkpoint_name)
         os.makedirs(save_subdir, exist_ok=True)
 
     for i, image_file in enumerate(test_imgs):
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
         if PLOT:
             fix, axs = plt.subplots(1, 2, figsize=(15, 15))
-            axs[0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            axs[0].imshow(img)
             axs[1].imshow(mask)
             plt.tight_layout()
             plt.show()

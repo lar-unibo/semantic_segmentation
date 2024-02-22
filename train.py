@@ -7,16 +7,34 @@ from dataset import BasicDataset
 from utils import dice_coeff, set_seeds, PolyLR, MODEL_MAP
 from torchvision.utils import make_grid
 
-from compute_metrics_seg import get_metrics
+from compute_metrics_seg_multiclass import compute
 
+CLOTHES2 = {
+    "num_classes": 3,
+    "dataset_name": "/home/lar/dev/labeling_dlo_sam/data/clothes2_filtered",
+    "test_set": "/home/lar/dev/labeling_dlo_sam/data/TEST_SEGMENTATION/clothes2",
+}
 
-dataset_name = sys.argv[1]
+CLOTHES = {
+    "num_classes": 4,
+    "dataset_name": "/home/lar/dev/labeling_dlo_sam/data/clothes_filtered",
+    "test_set": "/home/lar/dev/labeling_dlo_sam/data/TEST_SEGMENTATION/clothes",
+}
+
+ROPES = {
+    "num_classes": 3,
+    "dataset_name": "/home/lar/dev/labeling_dlo_sam/data/ropes_filtered",
+    "test_set": "/home/lar/dev/labeling_dlo_sam/data/TEST_SEGMENTATION/ropes",
+}
+
+DATA_CONFIG = CLOTHES2
+
 
 hyperparameter_defaults = dict(
-    num_classes=4,
-    backbone="resnet50",
-    epochs=100,
-    lr=1e-3,
+    num_classes=DATA_CONFIG["num_classes"],
+    backbone="swinT",
+    epochs=200,
+    lr=1e-4,
     batchsize=4,
     pretrained_backbone=True,
     early_stopping_patience=5,
@@ -24,10 +42,10 @@ hyperparameter_defaults = dict(
     freq_validation_per_epoch=1,
     ckpt_pre_train="",
     ckpt_resume="",
-    dataset_name=dataset_name,
+    dataset_name=DATA_CONFIG["dataset_name"],
     dataset_path="",
     transforms="transforms_base",
-    test_set="",
+    test_set=DATA_CONFIG["test_set"],
     test_every_n_epocochs=1,
     scheduler="poly",  # step, cosine, poly
     warmup_steps=1000,
@@ -37,8 +55,12 @@ hyperparameter_defaults = dict(
     seed=0,
 )
 
+
+DATASET_TYPE = hyperparameter_defaults["dataset_name"].split("/")[-1].split("_")[0]
+print(f"DATASET_TYPE: {DATASET_TYPE}")
+
 wandb.init(
-    config=hyperparameter_defaults, project="deformable_objects_segmentation", entity="acaporali", mode="disabled"
+    config=hyperparameter_defaults, project="deformable_objects_segmentation", entity="acaporali", mode="online"
 )
 config = wandb.config
 
@@ -47,33 +69,30 @@ set_seeds(config.seed)
 
 transforms_base = aug.Compose(
     [
-        aug.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=50, val_shift_limit=50, p=0.8),
+        aug.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=0, val_shift_limit=0, p=0.8),
         aug.Flip(p=0.5),
         aug.Perspective(scale=(0, 0.1), p=0.5),
-        aug.RandomBrightnessContrast(contrast_limit=[0, 0.1], brightness_limit=[-0.1, 0]),
+        aug.RandomBrightnessContrast(contrast_limit=[0.1, 0.1], brightness_limit=[-0.1, 0.1]),
     ],
     p=1,
 )
 
 
-def benchmark(net, device, global_step, threshold=77):
-    def predict_img(net, img, device):
-        net.eval()
+def benchmark_multiclass(net, device, global_step):
+    net.eval()
 
-        img = torch.from_numpy(BasicDataset.pre_process(np.array(img)))
-        img = img.unsqueeze(0)
+    def predict_img_multiclass(net, img, device):
+        img = torch.from_numpy(BasicDataset.pre_process(np.array(img))).unsqueeze(0)
         img = img.to(device=device, dtype=torch.float32)
-
         with torch.no_grad():
-            output = net(img)
-            probs = torch.sigmoid(output)
-            probs = probs.squeeze(0).cpu()
-            full_mask = probs.squeeze().cpu().numpy()
-
+            output = net(img).squeeze(0)
+            full_mask = torch.softmax(output, dim=0).cpu().numpy()
+        full_mask = np.argmax(full_mask, axis=0)
         return full_mask
 
-    test_imgs = glob.glob(config["test_set"] + "/gt_imgs/*")
-    test_labels = config["test_set"] + "/gt_labels"
+    path_imgs = os.path.join(config["test_set"], "gt_imgs")
+    path_labels = os.path.join(config["test_set"], "gt_masks")
+    test_imgs = glob.glob(os.path.join(path_imgs, "*"))
     test_imgs = [t for t in test_imgs if not os.path.isdir(t)]
 
     score_iou, score_dice = [], []
@@ -81,24 +100,29 @@ def benchmark(net, device, global_step, threshold=77):
         img_name = image_file.split("/")[-1]
 
         img = cv2.imread(image_file, cv2.IMREAD_COLOR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, (config["img_width"], config["img_height"]))
 
         # PREDICT
-        mask = predict_img(net=net, img=img, device=device)
-        mask = mask / np.max(mask)
-        result = (mask * 255).astype(np.uint8)
-        result[result > threshold] = 255
-        result[result != 255] = 0
+        mask = predict_img_multiclass(net=net, img=img, device=device)
 
-        label = cv2.imread(os.path.join(test_labels, img_name), cv2.IMREAD_GRAYSCALE)
-        label = cv2.resize(label, (config["img_width"], config["img_height"]))
-        label[label != 0] = 255
-        score = get_metrics(label, result)
+        label = cv2.imread(os.path.join(path_labels, img_name), cv2.IMREAD_GRAYSCALE)
+        label = cv2.resize(label, (config["img_width"], config["img_height"]), interpolation=cv2.INTER_NEAREST)
 
-        score_iou.append(score["iou"])
-        score_dice.append(score["dice"])
+        score = compute(label, mask)
 
-    wandb.log({"test_score_iou": np.mean(score_iou), "test_score_dice": np.mean(score_dice)}, step=global_step)
+        ious = [v["iou"] for k, v in score.items()]
+        dices = [v["dice"] for k, v in score.items()]
+
+        score_iou.append(np.mean(ious))
+        score_dice.append(np.mean(dices))
+
+    test_score_iou = np.mean(score_iou)
+    test_score_dice = np.mean(score_dice)
+    print(f"Test Score:  IoU {test_score_iou:.5f}, Dice {test_score_dice:.5f}")
+
+    wandb.log({"test_score_iou": test_score_iou, "test_score_dice": test_score_dice}, step=global_step)
+    net.train()
 
 
 def eval_net(net, loader, device, global_step, log_img=True):
@@ -204,11 +228,11 @@ def train_net(
 
             scheduler.step()
 
-        if config["num_classes"] == 1:
-            if epoch % config["test_every_n_epocochs"] == 0 and config["test_set"] is not None:
-                benchmark(net=net, device=device, global_step=global_step)
+        print("Validation loss: {}".format(val_loss))
 
-        print("Validation Score: {}".format(val_score))
+        if config["num_classes"] > 1:
+            if epoch % config["test_every_n_epocochs"] == 0 and config["test_set"] is not None:
+                benchmark_multiclass(net=net, device=device, global_step=global_step)
 
         state = {
             "num_classes": config["num_classes"],
@@ -239,7 +263,7 @@ def train_net(
         # SAVE BEST CHECKPOINT
         if val_loss < min_loss:
             min_loss = val_loss
-            torch.save(state, os.path.join(checkpoint_dir, "CP_Best_{}.pth".format(wandb.run.name)))
+            torch.save(state, os.path.join(checkpoint_dir, "CP_{}_{}.pth".format(DATASET_TYPE, wandb.run.name)))
             print("*** New min validation loss {}, checkpoint BEST saved!".format(val_loss))
 
         # SAVE LAST CHECKPOINT
