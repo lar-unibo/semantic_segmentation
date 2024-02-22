@@ -66,22 +66,23 @@ def compute(y_true, y_pred):
 
 
 if __name__ == "__main__":
-    MAIN_FOLDER = "/home/lar/dev/labeling_dlo_sam/data/TEST_SEGMENTATION/clothes2"
+    MAIN_FOLDER = "/home/lar/dev/labeling_dlo_sam/data/TEST_SEGMENTATION/clothes"
 
     MASKS_TO_TEST = [
-        "CLOTHES2_virtuous-rabbit-34",
-        "CLOTHES2_beaming-bao-38",
-        "CLOTHES2_lambent-festival-36",
-        "CLOTHES2_radiant-rooster-37",
-        # "CLOTHES_abundant-dragon-32",
-        # "CLOTHES_brilliant-rocket-33",
-        # "CLOTHES_lambent-ox-31",
-        # "CLOTHES_twinkling-festival-30",
+        # "CLOTHES2_virtuous-rabbit-34",
+        # "CLOTHES2_beaming-bao-38",
+        # "CLOTHES2_lambent-festival-36",
+        # "CLOTHES2_radiant-rooster-37",
+        "CLOTHES_abundant-dragon-32",
+        "CLOTHES_brilliant-rocket-33",
+        "CLOTHES_lambent-ox-31",
+        "CLOTHES_twinkling-festival-30",
     ]
 
     gt_imgs_dir = os.path.join(MAIN_FOLDER, "gt_imgs")
     gt_labels_dir = os.path.join(MAIN_FOLDER, "gt_masks")
 
+    scores_dict = {}
     for mask_to_test in MASKS_TO_TEST:
 
         iou_scores, dice_scores = [], []
@@ -108,3 +109,19 @@ if __name__ == "__main__":
         print(f"Model: {mask_to_test}")
         print(f"Mean IoU: {np.mean(iou_scores):.3f} - Mean Dice: {np.mean(dice_scores):.3f}")
         print()
+
+        key = mask_to_test.split("_")[-1]
+        scores_dict[key] = iou_scores
+
+    # save
+    import json
+
+    with open(os.path.join(MAIN_FOLDER, "scores.json"), "w") as f:
+        json.dump(scores_dict, f)
+
+    if False:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+        ax.boxplot(scores_dict.values(), showfliers=False)
+        ax.set_xticklabels(MASKS_TO_TEST)
+        ax.set_ylim(0, 1)
+        plt.show()

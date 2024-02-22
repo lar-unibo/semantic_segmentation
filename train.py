@@ -22,7 +22,7 @@ CLOTHES = {
 }
 
 ROPES = {
-    "num_classes": 3,
+    "num_classes": 4,
     "dataset_name": "/home/lar/dev/labeling_dlo_sam/data/ropes_filtered",
     "test_set": "/home/lar/dev/labeling_dlo_sam/data/TEST_SEGMENTATION/ropes",
 }

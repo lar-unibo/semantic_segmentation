@@ -3,11 +3,17 @@ import os, cv2, glob, json
 import matplotlib.pyplot as plt
 
 MAPPING = {
+    # clothes
     "giallo": 2,
     "verde": 3,
     "grigio": 1,
+    # clothes2
     "gallo": 2,
     "quadri": 1,
+    # ropes
+    "black": 2,
+    "red": 3,
+    "red_dot": 1,
 }
 
 
